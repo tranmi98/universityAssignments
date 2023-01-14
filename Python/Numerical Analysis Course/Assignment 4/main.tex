@@ -1,0 +1,110 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage[textwidth=7in,textheight=10.5in]{geometry}
+\usepackage{appendix}
+\usepackage{subfig}
+\usepackage{amsmath}
+\usepackage[francais]{babel}
+
+\usepackage[compact]{titlesec}
+
+\title{\vspace*{-12mm}
+Gradients conjugués}
+\author{\small{Minh-Phuong Tran - 51091600 - Décembre 2018}}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace*{-12mm}
+
+
+\section{Introduction}
+La méthode des gradients conjugués est une méthode itérative résolvant les systèmes symétriques et définies positives. En arithmétique exacte, cette méthode converge en au plus m, la taille du système ce qui est une propriété intéressante. Néanmoins, comme il ne sera pas possible de travailler sans erreurs d'arrondi, cette propriété ne pourra pas être utilisée. Il faudra alors trouver une autre borne pour la vitesse de convergence.
+
+Deuxièmement, l'utilisation d'un préconditionneur ILU0 peut être associée au gradients conjugués et son effet sera étudié dans les sections suivantes.
+
+NB : Toutes les analyses se font par rapport aux systèmes fournis par le fichier ccore.py sauf indication contraire.
+\section{Conditionnement et spectre}
+Tout d'abord, dans le cas du maillage du ccore.py rappelons les paramètres ayant un impact sur le conditionnement.
+\begin{itemize}
+    \item La taille de l'entrefer, avec lequel le conditionnement évolue en $\frac{1}{x}$
+    \item Le raffinement du maillage
+    \item La perméabilité du noyau (proche de 0 : en $\frac{1}{x}$, loin de 0 : linéairement) 
+\end{itemize}
+Dans le reste de cet article, le conditionnement sera modifié avec la taille de l'entrefer et les analyses se feront en fonction de ce paramètre.
+
+Le préconditionnement est un outil intéressant pour les systèmes mal conditionnés. En effet, lorsqu'appliqué à un système, le nouveau système obtenu est beaucoup mieux conditionné. De sorte que l'on préfère résoudre $M^{-1} A x= M^{-1}b$ que le système initial $A x = b$ avec M le préconditionneur. Pour cela, il faut que $\kappa(M^{-1}A)\ll \kappa(A)$
+Le préconditionneur qui sera utilisé dans le reste de l'article est le préconditionneur ILU0 (appliquant une décomposition LU incomplète au système).
+
+Ainsi, avec la Figure \ref{fig:spectre}, le conditionnement du système avec préconditionneur ILU0 est nettement meilleure que sans et la différence est d'autant plus marquante que le système de base est mal conditionné. Le spectre des valeurs propres du système avec préconditionneur est également beaucoup moins large que le système de base. L'utilisation d'un préconditionneur ILU0 est dont justifiée, d'autant plus que la méthode des gradients conjugués converge plus rapidement lorsque le spectre des valeurs propres est "regroupé" (\textit{clustered}) (sauf autour de 0)\cite{emory} ce qui est bien donné par ILU0 \cite{tum}. 
+\begin{figure}[h!]
+    \vspace*{-4mm}
+    \centering
+    \includegraphics[scale = 0.38]{cond.png}
+    \includegraphics[scale = 0.38]{spectregap.png}
+        \vspace*{-4mm}
+
+    \caption{Spectre et conditionnement avec et sans préconditionnement en fonction de la largeur de l'entrefer}
+    \label{fig:spectre}
+\end{figure}
+\vspace*{-7mm}
+\section{Convergence}
+La convergence de la méthode des gradients conjugués peut être mesurée par son nombre d'itérations comme montré sur la Figure \ref{fig:conv}. Sur le premier graphique, la convergence évolue en $\frac{1}{x}$ avec la largeur de l'entrefer. On observe grâce à ce graphique que lorsque la largeur de l'entrefer devient de plus en plus petite, c'est-à-dire que le problème et de moins en moins bien conditionné, il devient beaucoup plus intéressant de travailler avec un préconditionneur qui permet de réduire drastiquement le nombre d'itérations, que sans. La relation directe entre la convergence et le conditionnement est montrée sur le 2e graphique. En effet, le logarithme de la convergence évolue linéairement avec le logarithme du conditionnement. Ce qui veut dire que leur relation est de la sorte : $ \mbox{Nb d'itérations} = C * (\mbox{conditionnement})^a$. Ici l'exposant a peut être obtenu comme étant la pente du 2e graphique et C comme étant la pente du 3e graphique.
+Il est intéressant de voir que l'exposant a est fort semblable (voir le même) pour les 2 cas de figure (avec et sans préconditionnement) mais que C est bien inférieur dans le cas avec préconditionnement. 
+\begin{figure}[h!]
+    \vspace*{-4mm}
+    \centering
+    \includegraphics[scale = 0.39]{convergencegap.png}
+    \hfill
+    \includegraphics[scale = 0.2]{convcond1.png}
+    \hfill
+    \includegraphics[scale = 0.19]{convcond3.png}
+        \vspace*{-4mm}
+
+    \caption{Convergence en fonction du conditionnement}
+    \label{fig:conv}
+    \vspace*{-4mm}
+\end{figure}
+
+Enfin, une borne sur les erreurs à chaque itération et sur la vitesse de convergence peut être trouvée grâce au théorème 3.5 du livre Numerical Linear Algebra \cite{num} (pour des $\kappa$ larges et un A symétrique, défini positif avec $\kappa$ défini avec la 2-norm): 
+\[\frac{\|e_n\|_A}{\|e_0\|_A} \leq 2*(\frac{\sqrt{\kappa}-1}{\sqrt{\kappa}+1})^n \sim 1 - \frac{2}{\sqrt{\kappa}}
+\]
+Avec $\|v\|_A = (v^TAv)^{1/2}$ . Cela signifie que \textit{pour des k larges mais pas trop larges, la convergence vers une certaine tolérance peut être obenue en au plus O($\sqrt{\kappa}$) = O($\kappa^{0.5}$) itérations}\cite{num}. 
+
+Or dans notre cas, la relation entre le nombre d'itérations et le conditionnement a été trouvé précédemment (pour le cas sans préconditionnement): 
+\[ \mbox{Nb d'itérations} = 3.65 * (\mbox{conditionnement})^{0.47}\]
+L'exposant 0.47 est bien inférieur à 0.5 (pareillement dans le cas avec préconditionnement). La borne sur la vitesse de convergence est vérifiée pour les maillages générées par le ccore.py.
+
+Ensuite en calculant les erreurs à chaque itération et pour chaque système avec $\kappa$, la borne des erreurs est également vérifiée sur la Figure \ref{fig:err}, avec en bleu $2*(\frac{\sqrt{\kappa}-1}{\sqrt{\kappa}+1})^n$, et en rouge $\frac{\|e_n\|_A}{\|e_0\|_A}$: 
+\begin{figure}[h!]
+    \vspace*{-4mm}
+    \centering
+    \includegraphics[scale = 0.4]{err1.png}
+    \includegraphics[scale = 0.4]{err2.png}
+        \vspace*{-4mm}
+
+    \caption{Comparaison des erreurs par rapport à la borne annoncée}
+    \label{fig:err}
+    \vspace*{-7mm}
+\end{figure}
+\section{Conlusion}
+Au terme de cette analyse, l'utilisation du préconditionneur ILU0 sur les systèmes mal conditionnés est justifiée puisqu'elle permet une convergence plus rapide. La borne théorique sur les erreurs et la vitesse de convergence du théorème 3.5 est également vérifiée pour les maillages du ccore.py. Cela ne signifie pas pour autant qu'elle est vérifiée sur n'importe quel système en effet sur les systèmes générés par la fonction creatDF, ce n'est pas le cas où $\mbox{Nb d'itérations} = C * (\mbox{conditionnement})^{0.54}$ et où l'utilisation d'un préconditionneur avec des matrices de tailles faibles (et de conditionnement $\kappa$ faible) donne une convergence plus lente.
+\begin{figure}[h!]
+    \vspace*{-4mm}
+    \centering
+    \includegraphics[scale = 0.4]{convtaille.png}
+        \vspace*{-4mm}
+    \caption{Convergence CG en fonction de la taille du système}
+    \label{fig:sys}
+    \vspace*{-7mm}
+
+\end{figure}
+\begin{thebibliography}{00}
+\tiny
+\bibitem{emory} Emory College of Arts and Science, Department of Mathematics and Computer Science, Preconditioning Techniques for Large Linear
+Systems: A Survey, http://www.mathcs.emory.edu/~benzi/Web\_papers/survey.pdf
+
+\bibitem{tum} Technical University of Munich, Parallel Numerics, https://www5.in.tum.de/lehre/vorlesungen/parnum/WS11/PARNUM\_8.pdf
+\bibitem{num} Trefethen, Bau, Numerical Linear Algebra, Siam, 1997.
+\end{thebibliography}\end{document}
